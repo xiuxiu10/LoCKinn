@@ -1,0 +1,231 @@
+#include <ESP8266.h>
+#include<Wire.h>
+#include <I2Cdev.h>
+#include <Microduino_ColorLED.h> //引用彩灯库
+#ifdef ESP32
+#error "This code is not recommended to run on the ESP32 platform! Please check your Tools->Board setting."
+#endif
+#include <SoftwareSerial.h>
+#define PIN            D6         //彩灯引脚
+#define NUMPIXELS      1         //级联彩灯数量
+#define EspSerial mySerial
+#define UARTSPEED  9600
+SoftwareSerial mySerial(2, 3);
+ColorLED strip = ColorLED(NUMPIXELS, PIN); //定义彩灯数量和彩灯引脚号
+ESP8266 wifi(&EspSerial);
+#define SSID        "QAQ" //改为你的Wi-Fi名称
+
+#define PASSWORD    "2018210446"//Wi-Fi密码
+
+#define HOST_NAME   "api.heclouds.com"
+
+#define DEVICEID    "505339368" //OneNet上的设备ID
+
+#define PROJECTID   "184534" //OneNet上的产品ID
+
+#define HOST_PORT   (80)
+
+String apiKey = "7VkqRkIGntf9zUR2bm3jYZ44s1E=";
+
+
+String  t = "ssuo";
+long start;
+int servopin = 10;
+int angle;
+static const byte  GETDATA[]  PROGMEM = {
+  "GET https://api.heclouds.com/devices/503175419/datapoints?datastream_id=control&limit=1 HTTP/1.1\r\nHost:api.heclouds.com\r\napi-key:rDG8IUpC5M5=W3ghMHA2FR4Jihc=\r\nConnection: close\r\n\r\n"
+};
+
+int ws;
+String control = "";
+int judge;
+
+void servopulse(int angle)//定义一个脉冲函数
+{
+  int pulsewidth = (angle * 11) + 500; //将角度转化为500-2480的脉宽值，每多转1度，对应高电平多11us
+  digitalWrite(servopin, HIGH);   //将舵机接口电平至高
+  delayMicroseconds(pulsewidth);  //延时脉宽值的微秒数
+  digitalWrite(servopin, LOW);    //将舵机接口电平至低
+  delayMicroseconds(20000 - pulsewidth);
+}
+
+void setup() {
+  Wire.begin();
+  Serial.begin(9600);
+  pinMode(servopin, OUTPUT); //设定舵机接口为输出接口
+  strip.begin();           //彩灯初始化
+  strip.setBrightness(90); //设置彩灯亮度
+  strip.show();            //将彩灯点亮成设置的颜色
+  WifiInit(EspSerial, UARTSPEED);
+  Serial.println(wifi.getVersion().c_str());
+  if (wifi.setOprToStationSoftAP()) {} else {}
+  if (wifi.joinAP(SSID, PASSWORD)) {
+    ws = 1;
+  } else {
+    ws = 0;
+  }
+  if (wifi.disableMUX()) {} else {}
+}
+
+String online()
+{
+
+  //if(!tcp)
+  wifi.createTCP(HOST_NAME, HOST_PORT);
+
+
+  wifi.sendFromFlash(GETDATA, sizeof(GETDATA));
+  //从Flash读取发送内容，节约内存
+  uint8_t buffer[512] = {0};
+
+  uint32_t len = wifi.recv(buffer, sizeof(buffer), 20000);
+  if (len > 0)
+  {
+    short k = 0, temp = 0;
+    for (uint32_t i = 0; i < len; i++) {
+      if ((char)buffer[i] == 'v' && (char)buffer[i + 1] == 'a' && (char)buffer[i + 2] == 'l' && (char)buffer[i + 3] == 'u' && (char)buffer[i + 4] == 'e')
+      {
+        for (uint32_t j = 0; j < 4; j++)
+          control += (char)buffer[i + j + 8];
+      }
+    }
+    return control;
+  }
+}
+
+void loop() {
+  strip.setPixelColor(0, COLOR_WHITE);    //设置第0号灯为红色
+  control = "";
+  Serial.println(1);
+  delay(2000);       //延时2s
+  control = online();
+  Serial.println(control);
+  if (control != t) {
+    if (control == "ksuo")
+    {
+      t = control;
+      angle = 30;
+      for (int i = 0; i < 50; i++) //发送50个脉冲
+      {
+        servopulse(angle);   //引用脉冲函数
+      }
+      judge = 1;
+      updateSensorData();
+      strip.show();      //将彩灯点亮成设置的颜色
+      delay(10000);       //延时10s
+
+      strip.clear();     //清除所有灯的颜色
+      strip.show();      //将彩灯点亮成设置的颜色
+
+      delay(100);
+    }
+    else if (control == "ssuo")
+    {
+      t = control;
+      angle = 80;
+      for (int i = 0; i < 50; i++) //发送50个脉冲   //为什么是50个？
+      {
+        servopulse(angle);   //引用脉冲函数
+      }
+      judge = 0;
+      updateSensorData();
+      delay(100);
+    }
+    else
+    { angle = 0;
+      for (int i = 0; i < 50; i++) //发送50个脉冲   //为什么是50个？
+      {
+        servopulse(angle);   //引用脉冲函数
+      }
+    }
+
+
+  }
+}
+void updateSensorData()  {
+  String jsonToSend;
+  String postString;
+  if (wifi.createTCP(HOST_NAME, HOST_PORT)) { //建立TCP连接，如果失败，不能发送该数据
+
+    Serial.print("create tcp ok\r\n");
+
+
+
+    jsonToSend = "{\"judge\":\"";
+    jsonToSend += judge;
+    jsonToSend += "\"";
+    jsonToSend += "}";
+
+
+
+
+
+
+
+    postString = "POST /devices/";
+
+    postString += DEVICEID;
+
+    postString += "/datapoints?type=3 HTTP/1.1";
+
+    postString += "\r\n";
+
+    postString += "api-key:";
+
+    postString += apiKey;
+
+    postString += "\r\n";
+
+    postString += "Host:api.heclouds.com\r\n";
+
+    postString += "Connection:close\r\n";
+
+    postString += "Content-Length:";
+
+    postString += jsonToSend.length();
+
+    postString += "\r\n";
+
+    postString += "\r\n";
+
+    postString += jsonToSend;
+
+    postString += "\r\n";
+
+    postString += "\r\n";
+
+    postString += "\r\n";
+
+
+
+    const char *postArray = postString.c_str();                 //将str转化为char数组
+
+    Serial.println(postArray);
+
+    wifi.send((const uint8_t*)postArray, strlen(postArray));    //send发送命令，参数必须是这两种格式，尤其是(const uint8_t*)
+
+    Serial.println("send success");
+
+    if (wifi.releaseTCP()) {                                 //释放TCP连接
+
+      Serial.print("release tcp ok\r\n");
+
+    }
+
+    else {
+
+      Serial.print("release tcp err\r\n");
+
+    }
+
+    postArray = NULL;                                       //清空数组，等待下次传输数据
+
+
+
+  } else {
+
+    Serial.print("create tcp err\r\n");
+
+  }
+
+}
