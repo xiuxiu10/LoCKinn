@@ -1,0 +1,163 @@
+Page({
+
+
+
+
+
+  Lock: function (event) {
+    console.log(event)
+    
+    
+    wx.showModal({
+      title: '提示',
+      content: '是否上锁',
+      success: function (res) {
+        if (res.confirm) {
+          console.log('点击确定')
+          
+          wx.request({
+            url: 'https://api.heclouds.com/devices/503175419/datapoints?type=3',
+            header: {
+              "Content-Type": 'application/json',
+              "api-key": "rDG8IUpC5M5=W3ghMHA2FR4Jihc="
+            },
+            method: "post",
+            data: {
+              control: 'ssuo'
+            },
+            success: function (res) {
+            
+              setTimeout(() => {
+                
+              wx.request({
+                url: 'https://api.heclouds.com/devices/505339368/datapoints?datastream_id=judge&limit=1',
+                header: {
+                  "Content-Type": 'application/json',
+                  "api-key": "7VkqRkIGntf9zUR2bm3jYZ44s1E="
+
+                },
+                method: "GET",
+                data: {
+                  judge:''
+                },
+                success: function (res) {
+                  console.log(res) ;
+                  
+                  var app = getApp()
+
+                  app.globalData.judge = res.data.data.datastreams[0].datapoints[0].value
+                  if (app.globalData.judge==0) {
+                    wx.showToast({
+                      title: '上锁成功'
+                    })
+                    console.log(1)
+                  }
+                  else if (app.globalData.judge==1) {
+                    wx.showToast({
+                      title: '上锁失败'
+                    })
+                    console.log(0)
+                  }
+                  else{
+                    console.log(2)
+                  }
+
+                }
+              })
+              }, 10000)
+              
+            },
+            fail:function (err) {
+              console.log(err)
+            }
+          })
+        
+
+        }
+        else if (res.cancel) {
+          console.log('点击取消')
+        }
+
+      },
+    })
+  },
+  Unlock: function (event) {
+    
+    console.log(event)
+
+    wx.showModal({
+      title: '提示',
+      content: '是否开锁',
+      success: function (res) {
+        if (res.confirm) {
+          console.log('点击确定')
+          wx.request({
+            url: 'https://api.heclouds.com/devices/503175419/datapoints?type=3',
+            header: {
+              "Content-Type": 'application/json',
+              "api-key": "rDG8IUpC5M5=W3ghMHA2FR4Jihc="
+
+            },
+            method: "post",
+            data: {
+              control: 'ksuo'
+            },
+            success: function (res) {
+              
+            
+              setTimeout(() => {
+                
+                wx.request({
+                  url: 'https://api.heclouds.com/devices/505339368/datapoints?datastream_id=judge&limit=1',
+                  header: {
+                    "Content-Type": 'application/json',
+                    "api-key": "7VkqRkIGntf9zUR2bm3jYZ44s1E="
+
+                  },
+                  method: "GET",
+                  data: {
+                    judge:''
+                  },
+
+                  success: function (res) {
+                    console.log(res) ;
+                    
+                    var app = getApp()
+
+                    app.globalData.judge = res.data.data.datastreams[0].datapoints[0].value
+                    if (app.globalData.judge==1) {
+                      wx.showToast({
+                        title: '开锁成功',
+                      })
+                      console.log(1)
+                    }
+                    else if (app.globalData.judge==0) {
+                      wx.showToast({
+                        title: '开锁失败',
+                      })
+                      console.log(0)
+                    }
+                    else{
+                      console.log(2)
+                    }
+                  }
+                })
+              }, 10000)
+            },
+            fail: function (err) {
+              console.log(err)
+            }
+
+          })
+
+        }
+        else if (res.cancel) {
+          console.log('点击取消')
+        }
+      }
+
+    })
+
+  }
+
+})
